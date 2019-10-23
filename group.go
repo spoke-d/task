@@ -8,23 +8,25 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spoke-d/task/tomb"
 )
 
 // Group of tasks sharing the same lifecycle.
 //
 // All tasks in a group will be started and stopped at the same time.
 type Group struct {
-	mu      sync.Mutex
-	wg      sync.WaitGroup
-	clock   Clock
 	cancel  func()
 	tasks   []Task
+	mutex   sync.RWMutex
 	running map[int]bool
+	tomb    *tomb.Tomb
+	clock   Clock
 }
 
 // NewGroup creates a Group with sane defaults.
 func NewGroup() *Group {
 	return &Group{
+		tomb:  tomb.New(),
 		clock: wallClock{},
 	}
 }
@@ -51,21 +53,20 @@ func (g *Group) Start() {
 	ctx := context.Background()
 	ctx, g.cancel = context.WithCancel(ctx)
 
-	g.wg.Add(len(g.tasks))
-
 	g.running = make(map[int]bool)
 
-	for i := range g.tasks {
+	for i, task := range g.tasks {
 		g.running[i] = true
 
-		go func(task Task, i int) {
+		g.tomb.Go(func() error {
 			task.loop(ctx)
-			g.wg.Done()
 
-			g.mu.Lock()
+			g.mutex.Lock()
 			g.running[i] = false
-			g.mu.Unlock()
-		}(g.tasks[i], i)
+			g.mutex.Unlock()
+
+			return nil
+		})
 	}
 }
 
@@ -90,8 +91,9 @@ func (g *Group) Stop(timeout time.Duration) error {
 	}
 	g.cancel()
 
+	var err error
 	graceful := make(chan struct{}, 1)
-	go func() { g.wg.Wait(); close(graceful) }()
+	go func() { err = g.tomb.Wait(); close(graceful) }()
 
 	// Wait for graceful termination, but abort if the context expires.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -99,14 +101,20 @@ func (g *Group) Stop(timeout time.Duration) error {
 
 	select {
 	case <-ctx.Done():
+		g.mutex.RLock()
 		var running []string
 		for i, value := range g.running {
 			if value {
 				running = append(running, strconv.Itoa(i))
 			}
 		}
+		g.mutex.RUnlock()
+
+		if err := g.tomb.Kill(nil); err != nil {
+			return err
+		}
 		return errors.Errorf("tasks %s are still running", strings.Join(running, ", "))
 	case <-graceful:
-		return nil
+		return err
 	}
 }
