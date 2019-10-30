@@ -2,32 +2,31 @@ package task
 
 import (
 	"context"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/spoke-d/task/tomb"
+	"github.com/spoke-d/task/guard"
 )
 
 // Group of tasks sharing the same lifecycle.
 //
 // All tasks in a group will be started and stopped at the same time.
 type Group struct {
-	cancel  func()
 	tasks   []Task
-	mutex   sync.RWMutex
-	running map[int]bool
-	tomb    *tomb.Tomb
+	guard   *guard.Guard
+	cancel  context.CancelFunc
+	abort   chan struct{}
+	running sync.Map
 	clock   Clock
 }
 
 // NewGroup creates a Group with sane defaults.
 func NewGroup() *Group {
 	return &Group{
-		tomb:  tomb.New(),
-		clock: wallClock{},
+		guard:   guard.New(),
+		running: sync.Map{},
+		clock:   wallClock{},
 	}
 }
 
@@ -49,25 +48,26 @@ func (g *Group) Len() int {
 }
 
 // Start all the tasks in the group.
-func (g *Group) Start() {
+func (g *Group) Start() error {
 	ctx := context.Background()
 	ctx, g.cancel = context.WithCancel(ctx)
+	g.abort = make(chan struct{})
 
-	g.running = make(map[int]bool)
+	if err := g.guard.Unlock(); err != nil {
+		return err
+	}
 
 	for i, task := range g.tasks {
-		g.running[i] = true
-
-		g.tomb.Go(func() error {
-			task.loop(ctx)
-
-			g.mutex.Lock()
-			g.running[i] = false
-			g.mutex.Unlock()
-
-			return nil
-		})
+		g.running.Store(i, struct{}{})
+		go func(i int, task Task) {
+			g.guard.Visit(func() error {
+				task.loop(ctx)
+				g.running.Delete(i)
+				return nil
+			}, g.abort)
+		}(i, task)
 	}
+	return nil
 }
 
 // Stop all tasks in the group.
@@ -86,14 +86,16 @@ func (g *Group) Start() {
 // exits immediately and returns an error, otherwise it returns nil.
 func (g *Group) Stop(timeout time.Duration) error {
 	if g.cancel == nil {
-		// We were not even started
 		return nil
 	}
+
+	close(g.abort)
 	g.cancel()
 
-	var err error
-	graceful := make(chan struct{}, 1)
-	go func() { err = g.tomb.Wait(); close(graceful) }()
+	abort := make(chan struct{})
+
+	lockErrors := make(chan error, 1)
+	go func() { lockErrors <- g.guard.Lock(abort) }()
 
 	// Wait for graceful termination, but abort if the context expires.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -101,20 +103,29 @@ func (g *Group) Stop(timeout time.Duration) error {
 
 	select {
 	case <-ctx.Done():
-		g.mutex.RLock()
-		var running []string
-		for i, value := range g.running {
-			if value {
-				running = append(running, strconv.Itoa(i))
-			}
-		}
-		g.mutex.RUnlock()
+		close(abort)
 
-		if err := g.tomb.Kill(nil); err != nil {
-			return err
+		results := 0
+		g.running.Range(func(key, value interface{}) bool {
+			results++
+			return true
+		})
+
+		// Timeout if the guard didn't stop in time.
+		if results != 0 {
+			return errors.Errorf("tasks %d are still running", results)
 		}
-		return errors.Errorf("tasks %s are still running", strings.Join(running, ", "))
-	case <-graceful:
+		return errors.Errorf("timed out attempting to stop")
+	case err := <-lockErrors:
+		close(lockErrors)
 		return err
 	}
+}
+
+// Kill asks the group to stop and returns immediately.
+func (g *Group) Kill() error {
+	if err := g.guard.Kill(); err != nil {
+		return err
+	}
+	return g.guard.Wait()
 }
