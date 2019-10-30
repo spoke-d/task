@@ -73,3 +73,33 @@ func assertUnlocked(t *testing.T, guest Guest) {
 		}
 	}
 }
+
+func startBlockingVisit(t *testing.T, guard *Guard) chan<- struct{} {
+	t.Helper()
+
+	err := guard.Unlock()
+	if err != nil {
+		t.Errorf("expected err to be nil, actual: %v", err)
+	}
+
+	visitStarted := make(chan struct{}, 1)
+	defer close(visitStarted)
+
+	unblockVisit := make(chan struct{}, 1)
+	go func() {
+		err := guard.Visit(func() error {
+			visitStarted <- struct{}{}
+			<-unblockVisit
+			return nil
+		}, nil)
+		if err != nil {
+			t.Errorf("expected err to be nil, actual: %v", err)
+		}
+	}()
+	select {
+	case <-visitStarted:
+	case <-time.After(time.Second * 10):
+		t.Fatal("visit never started")
+	}
+	return unblockVisit
+}

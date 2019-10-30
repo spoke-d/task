@@ -115,7 +115,7 @@ func (g *Group) Stop(timeout time.Duration) error {
 		if results != 0 {
 			return errors.Errorf("tasks %d are still running", results)
 		}
-		return errors.Errorf("timedout attempting to stop")
+		return errors.Errorf("timed out attempting to stop")
 	case err := <-lockErrors:
 		close(lockErrors)
 		return err

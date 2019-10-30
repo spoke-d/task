@@ -1,6 +1,8 @@
 package guard
 
-import "github.com/juju/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 // Task describes any type whose validity and/or activity is bounded
 // in time. Most frequently, they will represent the duration of some
@@ -75,10 +77,10 @@ func Occupy(guard Guest, start StartFunc, abort <-chan struct{}) (Task, error) {
 		select {
 		case err := <-finished:
 			if err != nil {
-				return nil, errors.Trace(err)
+				return nil, errors.WithStack(err)
 			}
 		case err := <-failed:
-			return nil, errors.Trace(err)
+			return nil, errors.WithStack(err)
 		case tsk := <-started:
 			return tsk, nil
 		}

@@ -183,3 +183,117 @@ func TestConcurrentVisit(t *testing.T) {
 		t.Errorf("expected: %v, actual: %v", expected, actual)
 	}
 }
+
+func TestVisitUnlockThenUnblocks(t *testing.T) {
+	guard := New()
+	defer assertGuardStopped(t, guard)
+
+	visitied := make(chan error, 1)
+	go func() {
+		visitied <- guard.Visit(func() error {
+			return errors.New("bad")
+		}, nil)
+	}()
+	select {
+	case err := <-visitied:
+		t.Fatalf("unexpected Visit result: %v", err)
+	case <-time.After(time.Millisecond * 50):
+	}
+
+	err := guard.Unlock()
+	if err != nil {
+		t.Errorf("expected err to be nil, actual: %v", err)
+	}
+	select {
+	case err := <-visitied:
+		if expected, actual := "bad", err.Error(); expected != actual {
+			t.Errorf("expected: %v, actual: %v", expected, actual)
+		}
+	case <-time.After(time.Second * 10):
+		t.Error("timed out")
+	}
+}
+
+func TestVisitUnblocksLockdown(t *testing.T) {
+	guard := New()
+	defer assertGuardStopped(t, guard)
+
+	unblockVisit := startBlockingVisit(t, guard)
+	defer close(unblockVisit)
+
+	locked := make(chan error, 1)
+	go func() {
+		locked <- guard.Lock(nil)
+	}()
+	select {
+	case err := <-locked:
+		t.Errorf("unexpected locked down result: %v", err)
+	case <-time.After(time.Millisecond * 50):
+	}
+
+	assertLocked(t, guard)
+
+	unblockVisit <- struct{}{}
+	select {
+	case err := <-locked:
+		if err != nil {
+			t.Errorf("expected err to be nil, actual: %v", err)
+		}
+	case <-time.After(time.Second * 20):
+		t.Fatal("timed out")
+	}
+}
+
+func TestAbortedLockdownStillLocks(t *testing.T) {
+	guard := New()
+	defer assertGuardStopped(t, guard)
+
+	unblockVisit := startBlockingVisit(t, guard)
+	defer close(unblockVisit)
+
+	locked := make(chan error, 1)
+	abort := make(chan struct{})
+	go func() {
+		locked <- guard.Lock(abort)
+	}()
+	select {
+	case err := <-locked:
+		t.Errorf("unexpected locked down result: %v", err)
+	case <-time.After(time.Millisecond * 50):
+	}
+
+	close(abort)
+	select {
+	case err := <-locked:
+		if expected, actual := ErrAborted, err; expected != actual {
+			t.Errorf("expected err to be %v, actual: %v", expected, actual)
+		}
+	case <-time.After(time.Second * 20):
+		t.Fatal("timed out")
+	}
+
+	assertLocked(t, guard)
+}
+
+func TestAbortedLockdownUnlock(t *testing.T) {
+	guard := New()
+	defer assertGuardStopped(t, guard)
+
+	unblockVisit := startBlockingVisit(t, guard)
+	defer close(unblockVisit)
+
+	abort := make(chan struct{})
+	close(abort)
+
+	err := guard.Lock(abort)
+	if expected, actual := ErrAborted, err; expected != actual {
+		t.Errorf("expected err to be %v, actual: %v", expected, actual)
+	}
+
+	err = guard.Unlock()
+	if err != nil {
+		t.Errorf("expected err to be nil, actual: %v", err)
+	}
+
+	assertUnlocked(t, guard)
+}
