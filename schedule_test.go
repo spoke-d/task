@@ -1,14 +1,12 @@
-package task_test
+package task
 
 import (
 	"testing"
 	"time"
-
-	"github.com/spoke-d/task"
 )
 
 func TestEvery(t *testing.T) {
-	fn := task.Every(time.Second)
+	fn := Every(time.Second)
 	interval, err := fn()
 	if err != nil {
 		t.Errorf("expected err to be nil")
@@ -19,10 +17,10 @@ func TestEvery(t *testing.T) {
 }
 
 func TestEveryWithOption(t *testing.T) {
-	fn := task.Every(time.Second, task.SkipFirst)
+	fn := Every(time.Second, SkipFirst)
 	interval, err := fn()
 
-	if expected, actual := task.ErrSkip, err; expected != actual {
+	if expected, actual := ErrSkip, err; expected != actual {
 		t.Errorf("expected: %v, actual: %v", expected, actual)
 	}
 	if expected, actual := time.Second, interval; expected != actual {

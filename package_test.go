@@ -1,3 +1,3 @@
 package task_test
 
-//go:generate mockgen -package mocks -destination mocks/clock_mock.go github.com/spoke-d/task Clock
+//go:generate mockgen -package task -destination clock_mock_test.go github.com/spoke-d/task Clock

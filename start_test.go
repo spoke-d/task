@@ -1,18 +1,16 @@
-package task_test
+package task
 
 import (
 	"context"
 	"testing"
 	"time"
-
-	"github.com/spoke-d/task"
 )
 
 func TestStart(t *testing.T) {
 	ok := make(chan struct{})
 	f := func(context.Context) { close(ok) }
 
-	stop, _ := task.Start(f, task.Every(time.Second))
+	stop, _ := Start(f, Every(time.Second))
 
 	select {
 	case <-ok:

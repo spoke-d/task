@@ -1,4 +1,4 @@
-package task_test
+package task
 
 import (
 	"context"
@@ -6,25 +6,24 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/spoke-d/task"
 )
 
 func TestTaskExecuteImmediately(t *testing.T) {
 	f, wait := newFunc(t, 1)
-	defer startTask(t, f, task.Every(time.Second))()
+	defer startTask(t, f, Every(time.Second))()
 	wait(100 * time.Millisecond)
 }
 
 func TestTaskExecutePeriodically(t *testing.T) {
 	f, wait := newFunc(t, 2)
-	defer startTask(t, f, task.Every(250*time.Millisecond))()
+	defer startTask(t, f, Every(250*time.Millisecond))()
 	wait(100 * time.Millisecond)
 	wait(400 * time.Millisecond)
 }
 
 func TestTaskReset(t *testing.T) {
 	f, wait := newFunc(t, 3)
-	stop, reset := task.Start(f, task.Every(250*time.Millisecond))
+	stop, reset := Start(f, Every(250*time.Millisecond))
 	defer stop(time.Second)
 
 	wait(50 * time.Millisecond)
@@ -35,7 +34,7 @@ func TestTaskReset(t *testing.T) {
 
 func TestTaskZeroInterval(t *testing.T) {
 	f, _ := newFunc(t, 0)
-	defer startTask(t, f, task.Every(0*time.Millisecond))()
+	defer startTask(t, f, Every(0*time.Millisecond))()
 
 	time.Sleep(100 * time.Millisecond)
 }
@@ -70,7 +69,7 @@ func TestTaskSkipFirst(t *testing.T) {
 	f := func(context.Context) {
 		i++
 	}
-	defer startTask(t, f, task.Every(30*time.Millisecond, task.SkipFirst))()
+	defer startTask(t, f, Every(30*time.Millisecond, SkipFirst))()
 	time.Sleep(40 * time.Millisecond)
 
 	if expected, actual := 1, i; expected != actual {
@@ -89,7 +88,7 @@ func TestTaskSkipFirst(t *testing.T) {
 // is allowed run: when that number is reached the task function will trigger a
 // test failure (zero means that the task function will make the test fail as
 // soon as it is invoked).
-func newFunc(t *testing.T, n int) (task.Func, func(time.Duration)) {
+func newFunc(t *testing.T, n int) (Func, func(time.Duration)) {
 	t.Helper()
 
 	i := 0
@@ -111,12 +110,12 @@ func newFunc(t *testing.T, n int) (task.Func, func(time.Duration)) {
 	return f, wait
 }
 
-// Convenience around task.Start which also makes sure that the stop function
+// Convenience around Start which also makes sure that the stop function
 // of the task actually terminates.
-func startTask(t *testing.T, f task.Func, schedule task.Schedule) func() {
+func startTask(t *testing.T, f Func, schedule Schedule) func() {
 	t.Helper()
 
-	stop, _ := task.Start(f, schedule)
+	stop, _ := Start(f, schedule)
 	return func() {
 		if err := stop(time.Second); err != nil {
 			t.Fatal(err)

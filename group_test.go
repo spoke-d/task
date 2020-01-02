@@ -1,4 +1,4 @@
-package task_test
+package task
 
 import (
 	"context"
@@ -6,18 +6,17 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/spoke-d/task"
 )
 
 func TestGroupLen(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	ok := make(chan struct{})
 	f := func(context.Context) { close(ok) }
 
-	group.Add(f, task.Every(time.Second))
-	group.Add(f, task.Every(time.Minute))
+	group.Add(f, Every(time.Second))
+	group.Add(f, Every(time.Minute))
 
 	if expected, actual := 2, group.Len(); expected != actual {
 		t.Errorf("expected: %d, actual: %d", expected, actual)
@@ -25,13 +24,13 @@ func TestGroupLen(t *testing.T) {
 }
 
 func TestGroupStart(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	ok := make(chan struct{})
 	f := func(context.Context) { close(ok) }
 
-	group.Add(f, task.Every(time.Second*10))
+	group.Add(f, Every(time.Second*10))
 	group.Start()
 
 	select {
@@ -47,7 +46,7 @@ func TestGroupStart(t *testing.T) {
 }
 
 func TestGroupStop(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	ok := make(chan struct{})
@@ -56,7 +55,7 @@ func TestGroupStop(t *testing.T) {
 		<-ok
 	}
 
-	group.Add(f, task.Every(time.Second))
+	group.Add(f, Every(time.Second))
 	err := group.Start()
 	if err != nil {
 		t.Errorf("expected err not to be nil")
@@ -79,7 +78,7 @@ func TestGroupStop(t *testing.T) {
 }
 
 func TestGroupStopWithVisitBlocking(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	ok := make(chan struct{})
@@ -90,7 +89,7 @@ func TestGroupStopWithVisitBlocking(t *testing.T) {
 		<-ok
 	}
 
-	group.Add(f, task.Every(time.Second))
+	group.Add(f, Every(time.Second))
 	err := group.Start()
 	if err != nil {
 		t.Errorf("expected err not to be nil")
@@ -112,7 +111,7 @@ func TestGroupStopWithVisitBlocking(t *testing.T) {
 }
 
 func TestGroupStopStart(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	ok := make(chan struct{})
@@ -123,7 +122,7 @@ func TestGroupStopStart(t *testing.T) {
 
 	}
 
-	group.Add(f, task.Every(time.Second))
+	group.Add(f, Every(time.Second))
 
 	for i := 0; i < 5; i++ {
 		err := group.Start()
@@ -145,7 +144,7 @@ func TestGroupStopStart(t *testing.T) {
 }
 
 func TestGroupStopWithNoStart(t *testing.T) {
-	group := task.NewGroup()
+	group := NewGroup()
 	defer group.Kill()
 
 	err := group.Stop(time.Second)
