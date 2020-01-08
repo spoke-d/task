@@ -21,6 +21,14 @@ func TestTaskExecutePeriodically(t *testing.T) {
 	wait(400 * time.Millisecond)
 }
 
+func TestTaskExecuteTermination(t *testing.T) {
+	f, wait := newFuncTerminates(t, 2)
+	defer startTask(t, f, Every(250*time.Millisecond))()
+	wait(100 * time.Millisecond)
+	wait(400 * time.Millisecond)
+	wait(800 * time.Millisecond)
+}
+
 func TestTaskReset(t *testing.T) {
 	f, wait := newFunc(t, 3)
 	stop, reset := Start(f, Every(250*time.Millisecond))
@@ -107,6 +115,45 @@ func newFunc(t *testing.T, n int) (Func, func(time.Duration)) {
 		case <-notifications:
 		case <-time.After(timeout):
 			t.Fatalf("no notification received in %s", timeout)
+		}
+	}
+	return f, wait
+}
+
+// Create a new task function that sends a notification to a channel every time
+// it's run.
+//
+// Return the task function, along with a "wait" function which will block
+// until one notification is received through such channel, or fails the test
+// if too many notifications are received within the given timeout.
+//
+// The n parameter can be used to limit the number of times the task function
+// is allowed run: when that number is reached the task function will trigger
+// terminate error. This error ensures that the task can self terminate and no
+// other invocations are run.
+func newFuncTerminates(t *testing.T, n int) (Func, func(time.Duration)) {
+	t.Helper()
+
+	i := 0
+	notifications := make(chan struct{})
+	f := func(context.Context) error {
+		if i == n {
+			return ErrTerminate
+		}
+		notifications <- struct{}{}
+		i++
+		return nil
+	}
+	wait := func(timeout time.Duration) {
+		select {
+		case <-notifications:
+			if i > n {
+				t.Fatalf("unexpected notification received: %d", i)
+			}
+		case <-time.After(timeout):
+			if i != n {
+				t.Fatalf("no notification received in %s for %d", timeout, i)
+			}
 		}
 	}
 	return f, wait

@@ -3,7 +3,13 @@ package task
 import (
 	"context"
 	"time"
+
+	"github.com/pkg/errors"
 )
+
+// ErrTerminate is a special error that may be returned by a task function to
+// terminate the task.
+var ErrTerminate = errors.Errorf("terminate the task")
 
 // Clock represents the passage of time in a way that
 // can be faked out for tests.
@@ -42,13 +48,13 @@ func (t *Task) Reset() {
 func (t *Task) loop(ctx context.Context) {
 	// Kick off the task immediately (as long as the the schedule is
 	// greater than zero, see below).
-	var fErr error
+	var fnErr error
 	delay := immediately
 
 	for {
 		var timer <-chan time.Time
 
-		schedule, err := t.schedule(fErr)
+		schedule, err := t.schedule(fnErr)
 		switch err {
 		case ErrSkip:
 			// Reset the delay to be exactly the schedule, so we
@@ -85,7 +91,12 @@ func (t *Task) loop(ctx context.Context) {
 				// Execute the task function synchronously. Consumers
 				// are responsible for implementing proper cancellation
 				// of the task function itself using the tomb's context.
-				fErr = t.f(ctx)
+				fnErr = t.f(ctx)
+				// If the fnErr requires the task to terminate, do so
+				// immediately
+				if fnErr == ErrTerminate {
+					return
+				}
 				delay = schedule
 			} else {
 				// Don't execute the task function, and set the
