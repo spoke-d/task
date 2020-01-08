@@ -84,17 +84,17 @@ func Backoff(interval time.Duration, options ...BackoffOption) Schedule {
 		option(opt)
 	}
 	var (
-		amount           = 1
+		amount           = 0
 		originalInterval = interval
 	)
 	return func(err error) (time.Duration, error) {
 		// Attempt to handle the backing off
 		if err == nil {
-			amount = 1
+			amount = 0
 			interval = originalInterval
 		} else if err == ErrBackoff && opt.backoff != nil {
-			interval = opt.backoff(amount, originalInterval)
 			amount++
+			return opt.backoff(amount, originalInterval), nil
 		}
 		return interval, err
 	}

@@ -52,7 +52,7 @@ func TestBackoffWithOption(t *testing.T) {
 
 	for i := 1; i < 5; i++ {
 		interval, err = fn(ErrBackoff)
-		if expected, actual := ErrBackoff, err; expected != actual {
+		if expected, actual := true, err == nil; expected != actual {
 			t.Errorf("expected: %v, actual: %v", expected, actual)
 		}
 		if expected, actual := time.Second*time.Duration(i), interval; expected != actual {
