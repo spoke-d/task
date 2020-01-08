@@ -51,23 +51,25 @@ func Daily(options ...EveryOption) Schedule {
 	return Every(24*time.Hour, options...)
 }
 
-type everyOption interface {
-	setSkipFirst(bool)
+// EveryOptions represents a way to set optional values to a every option.
+// The EveryOptions shows what options are available to change.
+type EveryOptions interface {
+	SetSkipFirst(bool)
 }
 
 // SkipFirst is an option for the Every schedule that will make the schedule
 // skip the very first invocation of the task function.
-var SkipFirst = func(every everyOption) { every.setSkipFirst(true) }
+var SkipFirst = func(every EveryOptions) { every.SetSkipFirst(true) }
 
 // EveryOption captures a tweak that can be applied to the Every schedule.
-type EveryOption func(everyOption)
+type EveryOption func(EveryOptions)
 
 // Captures options for the Every schedule.
 type every struct {
 	skipFirst bool // If true, return ErrSkip at the very first execution
 }
 
-func (e *every) setSkipFirst(b bool) {
+func (e *every) SetSkipFirst(b bool) {
 	e.skipFirst = b
 }
 
@@ -100,27 +102,32 @@ func Backoff(interval time.Duration, options ...BackoffOption) Schedule {
 	}
 }
 
-type fnBackoff func(n int, t time.Duration) time.Duration
+// BackoffFunc is a type that represents a way to describe what the interval
+// time should be for each backoff request. The amount is used to say how many
+// iterations have occurred since the backoff was requested.
+type BackoffFunc func(n int, t time.Duration) time.Duration
 
-type backoffOption interface {
-	setBackoff(fnBackoff)
+// BackoffOptions represents a way to set optional values to a backoff option.
+// The BackoffOptions shows what options are available to change.
+type BackoffOptions interface {
+	SetBackoff(BackoffFunc)
 }
 
 // BackoffOption captures a tweak that can be applied to the Backoff schedule.
-type BackoffOption func(backoffOption)
+type BackoffOption func(BackoffOptions)
 
 // Captures options for the Backoff schedule.
 type backoff struct {
-	backoff fnBackoff
+	backoff BackoffFunc
 }
 
-func (e *backoff) setBackoff(f fnBackoff) {
+func (e *backoff) SetBackoff(f BackoffFunc) {
 	e.backoff = f
 }
 
 // Linear describes a backoff function that grows linearly with time.
-var Linear = func(backoff backoffOption) {
-	backoff.setBackoff(func(n int, t time.Duration) time.Duration {
+var Linear = func(backoff BackoffOptions) {
+	backoff.SetBackoff(func(n int, t time.Duration) time.Duration {
 		return t * time.Duration(n)
 	})
 }
