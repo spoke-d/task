@@ -42,12 +42,13 @@ func (t *Task) Reset() {
 func (t *Task) loop(ctx context.Context) {
 	// Kick off the task immediately (as long as the the schedule is
 	// greater than zero, see below).
+	var fErr error
 	delay := immediately
 
 	for {
 		var timer <-chan time.Time
 
-		schedule, err := t.schedule()
+		schedule, err := t.schedule(fErr)
 		switch err {
 		case ErrSkip:
 			// Reset the delay to be exactly the schedule, so we
@@ -84,7 +85,7 @@ func (t *Task) loop(ctx context.Context) {
 				// Execute the task function synchronously. Consumers
 				// are responsible for implementing proper cancellation
 				// of the task function itself using the tomb's context.
-				t.f(ctx)
+				fErr = t.f(ctx)
 				delay = schedule
 			} else {
 				// Don't execute the task function, and set the

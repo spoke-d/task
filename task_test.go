@@ -40,7 +40,7 @@ func TestTaskZeroInterval(t *testing.T) {
 }
 
 func TestTaskScheduleError(t *testing.T) {
-	schedule := func() (time.Duration, error) {
+	schedule := func(err error) (time.Duration, error) {
 		return 0, errors.Errorf("bad")
 	}
 	f, _ := newFunc(t, 0)
@@ -51,7 +51,7 @@ func TestTaskScheduleError(t *testing.T) {
 
 func TestTaskScheduleTemporaryError(t *testing.T) {
 	errored := false
-	schedule := func() (time.Duration, error) {
+	schedule := func(err error) (time.Duration, error) {
 		if !errored {
 			errored = true
 			return time.Millisecond, errors.Errorf("bad")
@@ -66,8 +66,9 @@ func TestTaskScheduleTemporaryError(t *testing.T) {
 
 func TestTaskSkipFirst(t *testing.T) {
 	i := 0
-	f := func(context.Context) {
+	f := func(context.Context) error {
 		i++
+		return nil
 	}
 	defer startTask(t, f, Every(30*time.Millisecond, SkipFirst))()
 	time.Sleep(40 * time.Millisecond)
@@ -93,12 +94,13 @@ func newFunc(t *testing.T, n int) (Func, func(time.Duration)) {
 
 	i := 0
 	notifications := make(chan struct{})
-	f := func(context.Context) {
+	f := func(context.Context) error {
 		if i == n {
 			t.Fatalf("task was supposed to be called at most %d times", n)
 		}
 		notifications <- struct{}{}
 		i++
+		return nil
 	}
 	wait := func(timeout time.Duration) {
 		select {
