@@ -13,7 +13,7 @@ func TestGroupLen(t *testing.T) {
 	defer group.Kill()
 
 	ok := make(chan struct{})
-	f := func(context.Context) { close(ok) }
+	f := func(context.Context) error { close(ok); return nil }
 
 	group.Add(f, Every(time.Second))
 	group.Add(f, Every(time.Minute))
@@ -28,7 +28,7 @@ func TestGroupStart(t *testing.T) {
 	defer group.Kill()
 
 	ok := make(chan struct{})
-	f := func(context.Context) { close(ok) }
+	f := func(context.Context) error { close(ok); return nil }
 
 	group.Add(f, Every(time.Second*10))
 	group.Start()
@@ -50,9 +50,10 @@ func TestGroupStop(t *testing.T) {
 	defer group.Kill()
 
 	ok := make(chan struct{})
-	f := func(context.Context) {
+	f := func(context.Context) error {
 		ok <- struct{}{}
 		<-ok
+		return nil
 	}
 
 	group.Add(f, Every(time.Second))
@@ -84,9 +85,10 @@ func TestGroupStopWithVisitBlocking(t *testing.T) {
 	ok := make(chan struct{})
 	defer close(ok)
 
-	f := func(context.Context) {
+	f := func(context.Context) error {
 		ok <- struct{}{}
 		<-ok
+		return nil
 	}
 
 	group.Add(f, Every(time.Second))
@@ -117,9 +119,9 @@ func TestGroupStopStart(t *testing.T) {
 	ok := make(chan struct{})
 	defer close(ok)
 
-	f := func(context.Context) {
+	f := func(context.Context) error {
 		ok <- struct{}{}
-
+		return nil
 	}
 
 	group.Add(f, Every(time.Second))

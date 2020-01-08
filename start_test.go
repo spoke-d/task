@@ -8,7 +8,7 @@ import (
 
 func TestStart(t *testing.T) {
 	ok := make(chan struct{})
-	f := func(context.Context) { close(ok) }
+	f := func(context.Context) error { close(ok); return nil }
 
 	stop, _ := Start(f, Every(time.Second))
 
