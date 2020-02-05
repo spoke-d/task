@@ -12,6 +12,7 @@ type Option func(*options)
 
 type options struct {
 	clock Clock
+	ctx   context.Context
 }
 
 // WithClock sets the sleeper on the options
@@ -23,10 +24,20 @@ func WithClock(clock Clock) Option {
 	}
 }
 
+// WithContext sets the sleeper on the options
+func WithContext(ctx context.Context) Option {
+	return func(options *options) {
+		if ctx != nil {
+			options.ctx = ctx
+		}
+	}
+}
+
 // Create a options instance with default values.
 func newOptions() *options {
 	return &options{
 		clock: wallClock{},
+		ctx:   context.Background(),
 	}
 }
 
@@ -65,6 +76,8 @@ func Wait(fn func(context.Context), timeout time.Duration, options ...Option) er
 
 	select {
 	case <-ch:
+		return nil
+	case <-opts.ctx.Done():
 		return nil
 	case <-opts.clock.After(timeout):
 		return errors.Errorf("timed out waiting for completion")
