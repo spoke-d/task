@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -124,7 +125,7 @@ func newTask() *task {
 	t := &task{
 		tomb: tomb.New(),
 	}
-	t.tomb.Go(func() error {
+	t.tomb.Go(func(context.Context) error {
 		<-t.tomb.Dying()
 		return nil
 	})

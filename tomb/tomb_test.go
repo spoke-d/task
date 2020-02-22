@@ -1,13 +1,14 @@
 package tomb
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/pkg/errors"
 )
 
-func nothing() error { return nil }
+func nothing(context.Context) error { return nil }
 
 func TestNewTomb(t *testing.T) {
 	tb := New()
@@ -18,9 +19,9 @@ func TestGo(t *testing.T) {
 	tb := New()
 
 	alive := make(chan bool)
-	tb.Go(func() error {
+	tb.Go(func(context.Context) error {
 		alive <- true
-		tb.Go(func() error {
+		tb.Go(func(context.Context) error {
 			alive <- true
 			<-tb.Dying()
 			return nil
@@ -46,9 +47,9 @@ func TestGoErr(t *testing.T) {
 	tb := New()
 
 	alive := make(chan bool)
-	tb.Go(func() error {
+	tb.Go(func(context.Context) error {
 		alive <- true
-		tb.Go(func() error {
+		tb.Go(func(context.Context) error {
 			alive <- true
 			return first
 		})

@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -95,7 +96,7 @@ func (g *Guard) allowGuests(allowGuests bool, abort <-chan struct{}) error {
 // loop waits for a Guard to unlock the Guard, and then runs visit funcs in
 // parallel until a Guard locks it down again; at which point, it waits for all
 // outstanding visits to complete, and reverts to its original state.
-func (g *Guard) loop() error {
+func (g *Guard) loop(_ context.Context) error {
 	var active sync.WaitGroup
 	defer active.Wait()
 

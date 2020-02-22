@@ -15,6 +15,9 @@ var (
 	ErrDying = errors.New("dying")
 )
 
+// Func represents the type alias for running.
+type Func = func(context.Context) error
+
 // A Tomb tracks the lifecycle of one or more goroutines as alive,
 // dying or dead, and the reason for their death.
 //
@@ -24,6 +27,8 @@ type Tomb struct {
 	alive  int
 	dying  chan struct{}
 	dead   chan struct{}
+	ctx    context.Context
+	cancel func()
 	reason error
 
 	// context.Context is available in Go 1.7+.
@@ -39,9 +44,12 @@ type childContext struct {
 
 // New will create a Tomb with sane defaults
 func New() *Tomb {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &Tomb{
 		dead:   make(chan struct{}),
 		dying:  make(chan struct{}),
+		ctx:    ctx,
+		cancel: cancel,
 		reason: ErrStillAlive,
 	}
 }
@@ -86,7 +94,7 @@ func (t *Tomb) Wait() error {
 // Calling the Go method after all tracked goroutines return
 // causes a runtime panic. For that reason, calling the Go
 // method a second time out of a tracked goroutine is unsafe.
-func (t *Tomb) Go(f func() error) error {
+func (t *Tomb) Go(f Func) error {
 	t.m.Lock()
 	defer t.m.Unlock()
 
@@ -166,8 +174,8 @@ func (t *Tomb) Context(parent context.Context) context.Context {
 	return child
 }
 
-func (t *Tomb) run(f func() error) {
-	err := f()
+func (t *Tomb) run(f Func) {
+	err := f(t.ctx)
 
 	t.m.Lock()
 	defer t.m.Unlock()
@@ -193,6 +201,7 @@ func (t *Tomb) kill(reason error) error {
 	}
 	if t.reason == ErrStillAlive {
 		t.reason = reason
+		t.cancel()
 		close(t.dying)
 		for _, child := range t.child {
 			child.cancel()
