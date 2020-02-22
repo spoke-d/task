@@ -38,7 +38,7 @@ func TestWait(t *testing.T) {
 		if expected, actual := "timed out waiting for completion", err.Error(); expected != actual {
 			t.Errorf("expected: %v, actual: %v", expected, actual)
 		}
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 200)
 		if expected, actual := true, called; expected != actual {
 			t.Errorf("expected: %v, actual: %v", expected, actual)
 		}
