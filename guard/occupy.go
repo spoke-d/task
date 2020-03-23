@@ -4,6 +4,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrSkip will tell the occupy to skip task execution.
+var ErrSkip = errors.Errorf("skip task execution")
+
 // Task describes any type whose validity and/or activity is bounded
 // in time. Most frequently, they will represent the duration of some
 // task or tasks running on internal goroutines, but it's possible and
@@ -80,6 +83,9 @@ func Occupy(guard Guest, start StartFunc, abort <-chan struct{}) (Task, error) {
 				return nil, errors.WithStack(err)
 			}
 		case err := <-failed:
+			if errors.Cause(err) == ErrSkip {
+				return nil, nil
+			}
 			return nil, errors.WithStack(err)
 		case tsk := <-started:
 			return tsk, nil
