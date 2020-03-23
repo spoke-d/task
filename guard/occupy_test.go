@@ -117,6 +117,26 @@ func TestStartSuccess(t *testing.T) {
 	}
 }
 
+func TestStartSkip(t *testing.T) {
+	guard := New()
+	defer assertGuardStopped(t, guard)
+
+	err := guard.Unlock()
+	if err != nil {
+		t.Errorf("expected err to be nil, actual: %v", err)
+	}
+
+	task, err := Occupy(guard, func() (Task, error) {
+		return nil, ErrSkip
+	}, nil)
+	if err != nil {
+		t.Errorf("expected err to be nil, actual: %v", err)
+	}
+	if expected, actual := true, task == nil; expected != actual {
+		t.Errorf("expected %v, actual: %v", expected, actual)
+	}
+}
+
 type task struct {
 	tomb *tomb.Tomb
 }
