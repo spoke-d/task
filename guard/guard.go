@@ -26,7 +26,7 @@ type Guard struct {
 // Wait().
 func New() *Guard {
 	guard := &Guard{
-		tomb:   tomb.New(),
+		tomb:   tomb.New(false),
 		guards: make(chan guard),
 		guests: make(chan guest),
 	}

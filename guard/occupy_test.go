@@ -143,7 +143,7 @@ type task struct {
 
 func newTask() *task {
 	t := &task{
-		tomb: tomb.New(),
+		tomb: tomb.New(false),
 	}
 	t.tomb.Go(func(context.Context) error {
 		<-t.tomb.Dying()
