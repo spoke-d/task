@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -11,12 +12,12 @@ import (
 func nothing(context.Context) error { return nil }
 
 func TestNewTomb(t *testing.T) {
-	tb := New()
+	tb := New(false)
 	checkState(t, tb, false, false, ErrStillAlive)
 }
 
 func TestGo(t *testing.T) {
-	tb := New()
+	tb := New(false)
 
 	alive := make(chan bool)
 	tb.Go(func(context.Context) error {
@@ -40,11 +41,40 @@ func TestGo(t *testing.T) {
 	checkState(t, tb, true, true, nil)
 }
 
+func TestGoKeepAlive(t *testing.T) {
+	tb := New(true)
+
+	alive := make(chan bool)
+	tb.Go(func(context.Context) error {
+		alive <- true
+		tb.Go(func(context.Context) error {
+			alive <- true
+			return nil
+		})
+		return nil
+	})
+	<-alive
+	<-alive
+
+	select {
+	case <-tb.Dying():
+		t.Fatal("should never go in to dying state")
+	case <-time.After(time.Millisecond * 250):
+	}
+
+	checkState(t, tb, false, false, ErrStillAlive)
+
+	tb.Kill(nil)
+	tb.Wait()
+
+	checkState(t, tb, true, true, nil)
+}
+
 func TestGoErr(t *testing.T) {
 	first := errors.New("first error")
 	second := errors.New("first error")
 
-	tb := New()
+	tb := New(false)
 
 	alive := make(chan bool)
 	tb.Go(func(context.Context) error {
@@ -66,7 +96,7 @@ func TestGoErr(t *testing.T) {
 
 func TestGoPanic(t *testing.T) {
 	// ErrDying being used properly, after a clean death.
-	tb := New()
+	tb := New(false)
 	tb.Go(nothing)
 	tb.Wait()
 
@@ -79,7 +109,7 @@ func TestGoPanic(t *testing.T) {
 
 func TestKill(t *testing.T) {
 	// a nil reason flags the goroutine as dying
-	tb := New()
+	tb := New(false)
 	tb.Kill(nil)
 	checkState(t, tb, true, false, nil)
 
@@ -98,7 +128,7 @@ func TestKill(t *testing.T) {
 }
 
 func TestKillf(t *testing.T) {
-	tb := New()
+	tb := New(false)
 
 	err := tb.Killf("BO%s", "OM")
 	if s := err.Error(); s != "BOOM" {
@@ -117,7 +147,7 @@ func TestKillf(t *testing.T) {
 
 func TestErrDying(t *testing.T) {
 	// ErrDying being used properly, after a clean death.
-	tb := New()
+	tb := New(false)
 	tb.Kill(nil)
 	tb.Kill(ErrDying)
 	checkState(t, tb, true, false, nil)
@@ -129,7 +159,7 @@ func TestErrDying(t *testing.T) {
 	checkState(t, tb, true, false, err)
 
 	// ErrDying being used badly, with an alive tomb.
-	tb = New()
+	tb = New(false)
 	err = tb.Kill(ErrDying)
 	if expected, actual := "kill with dying while still alive", errors.Cause(err).Error(); expected != actual {
 		t.Fatal(err)
@@ -139,7 +169,7 @@ func TestErrDying(t *testing.T) {
 }
 
 func TestKillErrStillAlivePanic(t *testing.T) {
-	tb := New()
+	tb := New(false)
 	err := tb.Kill(ErrStillAlive)
 	if expected, actual := "kill with still alive", errors.Cause(err).Error(); expected != actual {
 		t.Fatal(err)

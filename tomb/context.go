@@ -7,7 +7,7 @@ import "context"
 // that is closed when either the tomb is dying or the parent is canceled.
 // The returned context may also be obtained via the tomb's Context method.
 func WithContext(parent context.Context) (*Tomb, context.Context) {
-	t := New()
+	t := New(false)
 	if parent.Done() != nil {
 		go func() {
 			select {

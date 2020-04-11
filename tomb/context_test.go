@@ -111,7 +111,7 @@ func TestWithContext(t *testing.T) {
 }
 
 func TestContextNoParent(t *testing.T) {
-	tb := New()
+	tb := New(false)
 
 	parent2, cancel2 := context.WithCancel(context.WithValue(context.Background(), parent, grandParent))
 	child2 := tb.Context(parent2)

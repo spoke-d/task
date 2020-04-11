@@ -23,13 +23,14 @@ type Func = func(context.Context) error
 //
 // See the package documentation for details.
 type Tomb struct {
-	m      sync.Mutex
-	alive  int
-	dying  chan struct{}
-	dead   chan struct{}
-	ctx    context.Context
-	cancel func()
-	reason error
+	m         sync.Mutex
+	alive     int
+	keepAlive bool
+	dying     chan struct{}
+	dead      chan struct{}
+	ctx       context.Context
+	cancel    func()
+	reason    error
 
 	// context.Context is available in Go 1.7+.
 	parent interface{}
@@ -43,14 +44,15 @@ type childContext struct {
 }
 
 // New will create a Tomb with sane defaults
-func New() *Tomb {
+func New(keepAlive bool) *Tomb {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Tomb{
-		dead:   make(chan struct{}),
-		dying:  make(chan struct{}),
-		ctx:    ctx,
-		cancel: cancel,
-		reason: ErrStillAlive,
+		dead:      make(chan struct{}),
+		dying:     make(chan struct{}),
+		ctx:       ctx,
+		cancel:    cancel,
+		reason:    ErrStillAlive,
+		keepAlive: keepAlive,
 	}
 }
 
@@ -181,11 +183,25 @@ func (t *Tomb) run(f Func) {
 	defer t.m.Unlock()
 
 	t.alive--
-	if t.alive == 0 || err != nil {
+	// Kill the tomb if there is an error and close it once it's dead.
+	if err != nil {
 		t.kill(err)
 		if t.alive == 0 {
 			close(t.dead)
 		}
+		return
+	}
+
+	// If it's not alive, but want it to keep alive for longed lived tomb
+	// control, then setting it as keepAlive will do that. Using Kill will
+	// kill it directly.
+	if t.keepAlive {
+		return
+	}
+
+	if t.alive == 0 {
+		t.kill(nil)
+		close(t.dead)
 	}
 }
 
@@ -203,6 +219,9 @@ func (t *Tomb) kill(reason error) error {
 		t.reason = reason
 		t.cancel()
 		close(t.dying)
+		if t.keepAlive {
+			close(t.dead)
+		}
 		for _, child := range t.child {
 			child.cancel()
 		}
