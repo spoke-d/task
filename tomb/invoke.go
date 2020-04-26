@@ -7,7 +7,7 @@ import (
 )
 
 // Invoke a set of Tombs to be overseen by a Catacomb.
-func Invoke(tombs []*Tomb, fn Func) (*Catacomb, error) {
+func Invoke(fn Func, tombs ...*Tomb) (*Catacomb, error) {
 	catacomb := NewCatacomb()
 
 	for _, tomb := range tombs {
@@ -20,6 +20,7 @@ func Invoke(tombs []*Tomb, fn Func) (*Catacomb, error) {
 	catacomb.wg.Add(1)
 	go func() {
 		defer catacomb.wg.Done()
+
 		for {
 			select {
 			case <-catacomb.tomb.Dying():
@@ -32,7 +33,10 @@ func Invoke(tombs []*Tomb, fn Func) (*Catacomb, error) {
 
 	if err := catacomb.tomb.Go(func(ctx context.Context) error {
 		defer catacomb.wg.Wait()
-		return fn(ctx)
+
+		err := fn(context.WithValue(ctx, TombSource, catacomb))
+		catacomb.Kill(err)
+		return errors.WithStack(err)
 	}); err != nil {
 		for _, tomb := range tombs {
 			err = errors.WithMessage(Stop(tomb), err.Error())
