@@ -7,6 +7,17 @@ import (
 	"sync"
 )
 
+// ContextSource allows the selection of the source of the tomb in the context
+// for inspection or access.
+type ContextSource string
+
+const (
+	// TombSource describes the context-source of the tomb.
+	// TombSource is the same for both Tomb and Catacomb as you shouldn't care
+	// which it is, that's an implementation detail.
+	TombSource ContextSource = "tomb-source"
+)
+
 var (
 	// ErrStillAlive is a sentinel error to identify when a tomb is still alive.
 	ErrStillAlive = errors.New("still alive")
@@ -96,7 +107,7 @@ func (t *Tomb) Wait() error {
 // Calling the Go method after all tracked goroutines return
 // causes a runtime panic. For that reason, calling the Go
 // method a second time out of a tracked goroutine is unsafe.
-func (t *Tomb) Go(f Func) error {
+func (t *Tomb) Go(fn Func) error {
 	t.m.Lock()
 	defer t.m.Unlock()
 
@@ -107,7 +118,9 @@ func (t *Tomb) Go(f Func) error {
 	}
 
 	t.alive++
-	go t.run(f)
+	go t.run(func(ctx context.Context) error {
+		return fn(context.WithValue(ctx, TombSource, t))
+	})
 
 	return nil
 }
