@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func assertLocked(t *testing.T, guest Guest) {
 	visited := make(chan error)
 	abort := make(chan struct{})
 	go func() {
-		visited <- guest.Visit(func() error {
+		visited <- guest.Visit(func(context.Context) error {
 			return errors.New("bad")
 		}, abort)
 	}()
@@ -56,7 +57,7 @@ func assertUnlocked(t *testing.T, guest Guest) {
 
 	visited := make(chan error)
 	go func() {
-		visited <- guest.Visit(func() error {
+		visited <- guest.Visit(func(context.Context) error {
 			return errors.New("bad")
 		}, nil)
 	}()
@@ -87,7 +88,7 @@ func startBlockingVisit(t *testing.T, guard *Guard) chan<- struct{} {
 
 	unblockVisit := make(chan struct{}, 1)
 	go func() {
-		err := guard.Visit(func() error {
+		err := guard.Visit(func(context.Context) error {
 			visitStarted <- struct{}{}
 			<-unblockVisit
 			return nil

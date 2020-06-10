@@ -63,7 +63,7 @@ func (g *Guard) Lock(abort <-chan struct{}) error {
 // Visit waits until the guard is unlocked, then runs the supplied func.
 // It will return ErrAborted if the supplied Abort is closed before the func
 // is started.
-func (g *Guard) Visit(visit func() error, abort <-chan struct{}) error {
+func (g *Guard) Visit(visit func(context.Context) error, abort <-chan struct{}) error {
 	result := make(chan error)
 	select {
 	case <-g.tomb.Dying():
@@ -96,7 +96,7 @@ func (g *Guard) allowGuests(allowGuests bool, abort <-chan struct{}) error {
 // loop waits for a Guard to unlock the Guard, and then runs visit funcs in
 // parallel until a Guard locks it down again; at which point, it waits for all
 // outstanding visits to complete, and reverts to its original state.
-func (g *Guard) loop(_ context.Context) error {
+func (g *Guard) loop(ctx context.Context) error {
 	var active sync.WaitGroup
 	defer active.Wait()
 
@@ -108,7 +108,7 @@ func (g *Guard) loop(_ context.Context) error {
 			return tomb.ErrDying
 		case t := <-guests:
 			active.Add(1)
-			go t.complete(active.Done)
+			go t.complete(ctx, active.Done)
 		case t := <-g.guards:
 			// guard ticket requests are idempotent; it's not worth building
 			// the extra mechanism needed to (1) complain about abuse but
@@ -158,13 +158,13 @@ func (g guard) complete(wait func()) {
 
 // guest communicates between the guard and the main loop.
 type guest struct {
-	fn     func() error
+	fn     func(context.Context) error
 	result chan<- error
 }
 
 // complete unconditionally sends any error returned from the func, then
 // calls the finished func. It should be called on its own goroutine.
-func (g guest) complete(done func()) {
+func (g guest) complete(ctx context.Context, done func()) {
 	defer done()
-	g.result <- g.fn()
+	g.result <- g.fn(ctx)
 }
