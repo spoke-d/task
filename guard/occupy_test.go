@@ -13,7 +13,7 @@ func TestAbort(t *testing.T) {
 	guard := New()
 	defer assertGuardStopped(t, guard)
 
-	run := func() (Task, error) {
+	run := func(context.Context) (Task, error) {
 		t.Fatal("should be called")
 		return nil, nil
 	}
@@ -56,7 +56,7 @@ func TestStartError(t *testing.T) {
 		t.Errorf("expected err to be nil, actual: %v", err)
 	}
 
-	run := func() (Task, error) {
+	run := func(context.Context) (Task, error) {
 		return nil, errors.New("bad")
 	}
 	task, err := Occupy(guard, run, nil)
@@ -86,7 +86,7 @@ func TestStartSuccess(t *testing.T) {
 	stubTask := newTask()
 	defer killTask(t, stubTask)
 
-	task, err := Occupy(guard, func() (Task, error) {
+	task, err := Occupy(guard, func(context.Context) (Task, error) {
 		return stubTask, nil
 	}, nil)
 	if err != nil {
@@ -126,7 +126,7 @@ func TestStartSkip(t *testing.T) {
 		t.Errorf("expected err to be nil, actual: %v", err)
 	}
 
-	task, err := Occupy(guard, func() (Task, error) {
+	task, err := Occupy(guard, func(context.Context) (Task, error) {
 		return nil, ErrSkip
 	}, nil)
 	if err != nil {

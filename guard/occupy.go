@@ -1,6 +1,8 @@
 package guard
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -22,7 +24,7 @@ type Task interface {
 }
 
 // StartFunc starts a Task.
-type StartFunc func() (Task, error)
+type StartFunc func(context.Context) (Task, error)
 
 // Guest allows clients to Visit a guard when it's unlocked; that is, to
 // get non-exclusive access to whatever resource is being protected for the
@@ -32,7 +34,7 @@ type Guest interface {
 	// Visit waits until the guard is unlocked, then runs the supplied
 	// Visit func. It will return ErrAborted if the supplied Abort is closed
 	// before the Visit is started.
-	Visit(fn func() error, abort <-chan struct{}) error
+	Visit(fn func(context.Context) error, abort <-chan struct{}) error
 }
 
 // Occupy launches a Visit to guard that creates a task and holds the
@@ -53,8 +55,8 @@ func Occupy(guard Guest, start StartFunc, abort <-chan struct{}) (Task, error) {
 	started := make(chan Task, 1)
 	failed := make(chan error, 1)
 
-	task := func() error {
-		tsk, err := start()
+	task := func(ctx context.Context) error {
+		tsk, err := start(ctx)
 		if err != nil {
 			failed <- err
 			return nil

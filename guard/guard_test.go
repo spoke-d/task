@@ -1,6 +1,7 @@
 package guard
 
 import (
+	"context"
 	"errors"
 	"sync"
 	"testing"
@@ -31,7 +32,7 @@ func TestStoppedVisit(t *testing.T) {
 	guard := New()
 	assertGuardStopped(t, guard)
 
-	err := guard.Visit(func() error {
+	err := guard.Visit(func(context.Context) error {
 		t.Fatalf("error if called")
 		return nil
 	}, nil)
@@ -109,7 +110,7 @@ func TestVisitError(t *testing.T) {
 		t.Errorf("expected err to be nil, actual: %v", err)
 	}
 
-	err = guard.Visit(func() error {
+	err = guard.Visit(func(context.Context) error {
 		return errors.New("bad")
 	}, nil)
 	if expected, actual := "bad", err.Error(); expected != actual {
@@ -126,7 +127,7 @@ func TestVisitSuccess(t *testing.T) {
 		t.Errorf("expected err to be nil, actual: %v", err)
 	}
 
-	err = guard.Visit(func() error {
+	err = guard.Visit(func(context.Context) error {
 		return nil
 	}, nil)
 	if err != nil {
@@ -152,7 +153,7 @@ func TestConcurrentVisit(t *testing.T) {
 	for i := 0; i < count; i++ {
 		started.Add(1)
 		go func(i int) {
-			err := guard.Visit(func() error {
+			err := guard.Visit(func(context.Context) error {
 				started.Done()
 				<-unblocked
 				return nil
@@ -190,7 +191,7 @@ func TestVisitUnlockThenUnblocks(t *testing.T) {
 
 	visitied := make(chan error, 1)
 	go func() {
-		visitied <- guard.Visit(func() error {
+		visitied <- guard.Visit(func(context.Context) error {
 			return errors.New("bad")
 		}, nil)
 	}()
