@@ -1,6 +1,9 @@
 package task
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // Start a single task executing the given function with the given schedule.
 //
@@ -11,7 +14,7 @@ import "time"
 // more details.
 func Start(f Func, schedule Schedule) (func(time.Duration) error, func()) {
 	group := NewGroup()
-	defer group.Start()
+	defer group.Start(context.Background())
 
 	task := group.Add(f, schedule)
 

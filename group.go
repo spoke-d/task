@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/spoke-d/task/conjoint"
 	"github.com/spoke-d/task/guard"
 )
 
@@ -48,8 +49,7 @@ func (g *Group) Len() int {
 }
 
 // Start all the tasks in the group.
-func (g *Group) Start() error {
-	ctx := context.Background()
+func (g *Group) Start(ctx context.Context) error {
 	ctx, g.cancel = context.WithCancel(ctx)
 	g.abort = make(chan struct{})
 
@@ -60,8 +60,9 @@ func (g *Group) Start() error {
 	for i, task := range g.tasks {
 		g.running.Store(i, struct{}{})
 		go func(i int, task Task) {
-			g.guard.Visit(func() error {
-				task.loop(ctx)
+			g.guard.Visit(func(fnContext context.Context) error {
+				c, _ := conjoint.Context(ctx, fnContext)
+				task.loop(c)
 				g.running.Delete(i)
 				return nil
 			}, g.abort)

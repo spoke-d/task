@@ -31,7 +31,7 @@ func TestGroupStart(t *testing.T) {
 	f := func(context.Context) error { close(ok); return nil }
 
 	group.Add(f, Every(time.Second*10))
-	group.Start()
+	group.Start(context.TODO())
 
 	select {
 	case <-ok:
@@ -57,7 +57,7 @@ func TestGroupStop(t *testing.T) {
 	}
 
 	group.Add(f, Every(time.Second))
-	err := group.Start()
+	err := group.Start(context.TODO())
 	if err != nil {
 		t.Errorf("expected err not to be nil")
 	}
@@ -92,7 +92,7 @@ func TestGroupStopWithVisitBlocking(t *testing.T) {
 	}
 
 	group.Add(f, Every(time.Second))
-	err := group.Start()
+	err := group.Start(context.TODO())
 	if err != nil {
 		t.Errorf("expected err not to be nil")
 	}
@@ -127,7 +127,7 @@ func TestGroupStopStart(t *testing.T) {
 	group.Add(f, Every(time.Second))
 
 	for i := 0; i < 5; i++ {
-		err := group.Start()
+		err := group.Start(context.TODO())
 		if err != nil {
 			t.Errorf("expected err not to be nil")
 		}
