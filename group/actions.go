@@ -1,6 +1,7 @@
 package group
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 // action finishing, causing the closing of the group action.
 func Block(g *Group) {
 	cancel := make(chan struct{})
-	g.Add(func() error {
+	g.Add(func(ctx context.Context) error {
 		<-cancel
 		return nil
 	}, func(error) {
@@ -24,7 +25,7 @@ func Block(g *Group) {
 // interupt or terminate os signal is received.
 func Interrupt(g *Group) {
 	cancel := make(chan struct{})
-	g.Add(func() error {
+	g.Add(func(ctx context.Context) error {
 		return interrupt(cancel)
 	}, func(error) {
 		close(cancel)

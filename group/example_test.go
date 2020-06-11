@@ -13,7 +13,7 @@ func ExampleGroup_Add_basic() {
 	var g Group
 	{
 		cancel := make(chan struct{})
-		g.Add(func() error {
+		g.Add(func(context.Context) error {
 			select {
 			case <-time.After(time.Second):
 				fmt.Println("The first actor had its time elapsed")
@@ -28,7 +28,7 @@ func ExampleGroup_Add_basic() {
 		})
 	}
 	{
-		g.Add(func() error {
+		g.Add(func(context.Context) error {
 			fmt.Println("The second actor is returning immediately")
 			return errors.New("immediate teardown")
 		}, func(err error) {
@@ -55,7 +55,7 @@ func ExampleGroup_Add_context() {
 	var g Group
 	{
 		ctx, cancel := context.WithCancel(ctx) // note: shadowed
-		g.Add(func() error {
+		g.Add(func(context.Context) error {
 			return runUntilCanceled(ctx)
 		}, func(error) {
 			cancel()
@@ -71,7 +71,7 @@ func ExampleGroup_Add_listener() {
 	var g Group
 	{
 		ln, _ := net.Listen("tcp", ":0")
-		g.Add(func() error {
+		g.Add(func(context.Context) error {
 			defer fmt.Println("http.Serve returned")
 			return http.Serve(ln, http.NewServeMux())
 		}, func(error) {
@@ -79,7 +79,7 @@ func ExampleGroup_Add_listener() {
 		})
 	}
 	{
-		g.Add(func() error {
+		g.Add(func(context.Context) error {
 			return errors.New("immediate teardown")
 		}, func(error) {
 			// Nothing.

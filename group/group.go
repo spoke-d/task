@@ -1,5 +1,7 @@
 package group
 
+import "context"
+
 // Group collects actions (functions) and runs them concurrently. When one action
 // (function) returns, all actions are interrupted.
 // The zero value of a Group is useful.
@@ -18,7 +20,7 @@ func NewGroup() *Group {
 //
 // The first action (function) to return interrupts all running actions.
 // The error is passed to the interrupt functions and is returned by Run.
-func (g *Group) Add(execute func() error, interrupt func(error)) {
+func (g *Group) Add(execute func(context.Context) error, interrupt func(error)) {
 	g.actions = append(g.actions, action{execute, interrupt})
 }
 
@@ -31,16 +33,22 @@ func (g *Group) Run() error {
 		return nil
 	}
 
+	var cancel context.CancelFunc
+	ctx := context.TODO()
+	ctx, cancel = context.WithCancel(ctx)
+
 	// Run each action.
 	errors := make(chan error, len(g.actions))
 	for _, a := range g.actions {
 		go func(a action) {
-			errors <- a.execute()
+			errors <- a.execute(ctx)
 		}(a)
 	}
 
 	// Wait for the first action to stop.
 	err := <-errors
+
+	cancel()
 
 	// Signal all actions to stop.
 	for _, a := range g.actions {
@@ -57,6 +65,6 @@ func (g *Group) Run() error {
 }
 
 type action struct {
-	execute   func() error
+	execute   func(context.Context) error
 	interrupt func(error)
 }

@@ -1,6 +1,7 @@
 package group
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -30,7 +31,7 @@ func TestOne(t *testing.T) {
 		res     = make(chan error)
 	)
 
-	g.Add(func() error { return myError }, func(error) {})
+	g.Add(func(context.Context) error { return myError }, func(error) {})
 	go func() { res <- g.Run() }()
 
 	select {
@@ -52,8 +53,8 @@ func TestMany(t *testing.T) {
 		res       = make(chan error)
 	)
 
-	g.Add(func() error { return interrupt }, func(error) {})
-	g.Add(func() error { <-cancel; return nil }, func(error) { close(cancel) })
+	g.Add(func(context.Context) error { return interrupt }, func(error) {})
+	g.Add(func(context.Context) error { <-cancel; return nil }, func(error) { close(cancel) })
 	go func() { res <- g.Run() }()
 
 	select {
