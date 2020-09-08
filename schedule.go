@@ -38,6 +38,12 @@ func Every(interval time.Duration, options ...EveryOption) Schedule {
 	}
 	first := true
 	return func(err error) (time.Duration, error) {
+		// If we encounter a backoff error in an every request, then we can't
+		// handle it and just treat it like a nil error.
+		if err == ErrBackoff {
+			err = nil
+		}
+
 		if first && opt.skipFirst {
 			err = ErrSkip
 		}
